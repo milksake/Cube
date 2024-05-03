@@ -649,9 +649,11 @@ class CubePrimitive :
 {
 public:
 
-	CubePrimitive(std::vector<int> colors, const Vector3f& offset)
+	CubePrimitive(std::vector<int> colors, const Matrix4f& iniTrans)
 	{
-		while (colors.size() < 3)
+		transformation = iniTrans;
+
+		while (colors.size() < 6)
 		{
 			colors.push_back(0);
 		}
@@ -682,19 +684,19 @@ public:
 			int off0 = 0;
 			for (int j = 0; j < 8; j++)
 			{
-				vertices[8*i+j].color = colors[i];
+				vertices[8*i+j].color = (j < 4) ? colors[2*i] : colors[2*i+1];
 				if (points[j] & x)
 				{
-					vertices[8*i+off1].positions[0] = ((points[j] & 1) ? 0.5f : -0.5f) + offset[0];
-					vertices[8*i+off1].positions[1] = ((points[j] & 2) ? 0.5f : -0.5f) + offset[1];
-					vertices[8*i+off1].positions[2] = ((points[j] & 4) ? 0.5f : -0.5f) + offset[2];
+					vertices[8*i+off1].positions[0] = ((points[j] & 1) ? 0.5f : -0.5f);
+					vertices[8*i+off1].positions[1] = ((points[j] & 2) ? 0.5f : -0.5f);
+					vertices[8*i+off1].positions[2] = ((points[j] & 4) ? 0.5f : -0.5f);
 					off1++;
 				}
 				else
 				{
-					vertices[8*i+4+off0].positions[0] = ((points[j] & 1) ? 0.5f : -0.5f) + offset[0];
-					vertices[8*i+4+off0].positions[1] = ((points[j] & 2) ? 0.5f : -0.5f) + offset[1];
-					vertices[8*i+4+off0].positions[2] = ((points[j] & 4) ? 0.5f : -0.5f) + offset[2];
+					vertices[8*i+4+off0].positions[0] = ((points[j] & 1) ? 0.5f : -0.5f);
+					vertices[8*i+4+off0].positions[1] = ((points[j] & 2) ? 0.5f : -0.5f);
+					vertices[8*i+4+off0].positions[2] = ((points[j] & 4) ? 0.5f : -0.5f);
 					off0++;
 				}
 			}
@@ -769,7 +771,12 @@ public:
 				{
 					if (i == 1 && j == 1 && k == 1)
 						continue;
-				cubes.push_back(new CubePrimitive({colorsx[i], colorsy[j], colorsz[k]}, Vector3f({-1.05f+(float)i*1.05f, -1.05f+(float)j*1.05f, -1.05f+(float)k*1.05f})));
+					auto iniTrans =  Matrix4f::Translation(Vector4f({-1.05f+(float)i*1.05f, -1.05f+(float)j*1.05f, -1.05f+(float)k*1.05f, 1.0f}));
+					cubes.push_back(new CubePrimitive({
+						colorsx[i] * (i == 2), colorsx[i] * (i == 0),
+						colorsy[j] * (j == 2), colorsy[j] * (j == 0),
+						colorsz[k] * (k == 2), colorsz[k] * (k == 0)
+					}, iniTrans));
 				}
 			}
 		}
@@ -795,6 +802,14 @@ public:
 		for (auto& cube : cubes)
 		{
 			cube->draw();
+		}
+	}
+	
+	void moveFirstLine()
+	{
+		for (int i = 0; i < 3; i++)
+		{
+			cubes[3*i]->transform(Matrix4f::RotateX(pi));
 		}
 	}
 };
@@ -840,7 +855,7 @@ void init()
 	cube->transform(Matrix4f::Scaling(Vector4f({0.5f, 0.5f, 0.5f, 1.0f})));
 
 	float colors[] = {
-		0.5f, 0.5f, 0.5f, 1.0f,
+		0.0f, 0.0f, 0.0f, 1.0f,
 		0.0f, 0.6f, 0.3f, 1.0f,
 		1.0f, 1.0f, 1.0f, 1.0f,
 		0.7f, 0.1f, 0.2f, 1.0f,
@@ -898,6 +913,8 @@ void processKeyInput(GLFWwindow* window, int key, int scancode, int action, int 
 		transformtrx &= Matrix4f::Scaling(Vector4f({1.0f, 1.1f, 1.0f, 1.0f}));
 	if (key == GLFW_KEY_6)
 		transformtrx &= Matrix4f::Scaling(Vector4f({1.0f, 1.0f, 1.1f, 1.0f}));
+	if (key == GLFW_KEY_Z)
+		cube->moveFirstLine();
 
 	// printM(transformtrx);
 	cube->transform(transformtrx);
