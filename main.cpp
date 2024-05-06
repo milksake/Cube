@@ -50,7 +50,7 @@ public:
 	}
 
 	template <unsigned int M>
-	Vector<N, T>(const Vector<M, T>& val, bool last);
+	Vector<N, T>(const Vector<M, T>& val, bool last = false);
 
 	Vector<N, T>()
 	{
@@ -150,7 +150,7 @@ public:
 		return tmp;
 	}
 
-	Vector<N, T> operator* (T scale)
+	Vector<N, T> operator* (T scale) const
 	{
 		Vector<N, T> tmp;
 		for (int i = 0; i < N; i++)
@@ -238,6 +238,8 @@ public:
 		}
 	}
 
+	Vector<N, T> operator% (const Vector<N, T>& rhs) const;
+
 	T& operator[](int indx)
 	{
 		return vals[indx];
@@ -295,6 +297,19 @@ public:
 		}
 
 		return tmp;
+	}
+
+	void transpose()
+	{
+		auto old = *this;
+
+		for (int i = 0; i < N; i++)
+		{
+			for (int j = 0; j < M; j++)
+			{
+				vals[i][j] = old.vals[j][i];
+			}
+		}
 	}
 
 	Matrix<N, M, T>& operator=(const Matrix<N, M, T> mtrx)
@@ -579,7 +594,97 @@ public:
 
 		return tmp;
 	}
+
+	static Matrix<N, M, T> FromBase(const Vector<N, T>& u, const Vector<N, T>& v, const Vector<N, T>& w)
+	{
+		Matrix<N, M, T> tmp;
+
+		int lim = std::min(M, 3u);
+		
+		const Vector<N, T> * ptrs[3] = {&u, &v, &w};
+		for (int j = 0; j < lim; j++)
+		{
+			for (int i = 0; i < N; i++)
+			{
+				tmp.vals[i][j] = (*ptrs[j])[i];
+			}
+		}
+
+		return tmp;
+	}
+
+	static Matrix<N, M, T> Dual(const Vector<N, T>& vec)
+	{
+		Matrix<N, M, T> tmp;
+
+		tmp.vals[0][1] = -vec[2];
+		tmp.vals[1][0] = vec[2];
+		tmp.vals[2][0] = -vec[1];
+		tmp.vals[0][2] = vec[1];
+		tmp.vals[1][2] = -vec[0];
+		tmp.vals[2][1] = vec[0];
+
+		return tmp;		
+	}
+
+	static Matrix<N, M, T> LookAt(const Vector<N, T>& pos, const Vector<N, T>& center, const Vector<N, T>& up)
+	{
+		auto w = pos - center;
+		w.normalize();
+
+		auto u = up % w;
+		u.normalize();
+
+		auto v = w % u;
+
+		auto rotation = Matrix<N, M, T>::FromBase(u, v, w);
+		rotation.transpose();
+
+		auto ret = rotation & Matrix<N, M, T>::Translation(Vector<4, T>(pos * -1.0));
+		if (N >= 4 && M >= 4)
+			ret.vals[3][3] = (T)1;
+
+		return ret;
+	}
+
+	static Matrix<N, M, T> Ortho(T left, T right, T bottom, T top, T near, T far)
+	{
+		auto tmp = Matrix<N, M, T>::Scaling(Vector<N, T>({(T)2/(right-left), (T)2/(top-bottom), (T)2/(far-near), (T)1})) & Matrix<N, M, T>::Translation(Vector<N, T>({-(left+right)/(T)2, -(top+bottom)/(T)2, -(near+far)/(T)2, (T)1}));
+		tmp.vals[2][2] *= -1;
+
+		return tmp;
+	}
+
+	static Matrix<N, M, T> Perspec(T fov, T aspect, T zNear, T zFar)
+	{
+		T height = zNear * std::tan(fov / 2.0f);
+		T width = height * aspect;
+
+		T l = -width, r = width, b = -height, t = height;
+		T n = zNear, f = zFar;
+
+		Matrix<N, M, T> tmp;
+
+		tmp.vals[0][0] = 2.f*n/(r-l);
+
+		tmp.vals[1][1] = 2.*n/(t-b);
+
+		tmp.vals[0][2] = (r+l)/(r-l);
+		tmp.vals[1][2] = (t+b)/(t-b);
+		tmp.vals[2][2] = -(f+n)/(f-n);
+		tmp.vals[3][2] = -1.f;
+
+		tmp.vals[2][3] = -2.f*(f*n)/(f-n);
+
+		return tmp;
+	}
 };
+
+template<unsigned int N, typename T>
+Vector<N, T> Vector<N, T>::operator% (const Vector<N, T>& rhs) const
+{
+	return Vector<N, T>(Matrix<3, 3, T>::Dual(Vector<3, T>(*this)) & Vector<3, T>(rhs));
+}
 
 template<unsigned int N, typename T>
 void printM(const Matrix<N, N, T>& matrx)
@@ -628,8 +733,7 @@ public:
 
 	void transform(Matrix<4, 4, T> trans)
 	{
-		auto newPos = trans & Vector<4, T>({position[0], position[1], position[2], 1});
-		position = Vector<3, T>({newPos[0], newPos	[1], newPos[2]});
+		position = Vector<3, T>(trans & Vector<4, T>(position, true));
 		transformation = trans & transformation;
 	}
 
@@ -759,7 +863,7 @@ class Cube
 public:
 	Cube()
 	{
-		std::cout << "Creating Cubes\n";
+		std::cout << "Creating Cubes...\n";
 		int colorsx[3] = {1, 0, 5};
 		int colorsy[3] = {2, 0, 4};
 		int colorsz[3] = {3, 0, 6};
@@ -807,14 +911,172 @@ public:
 	
 	void moveFirstLine()
 	{
-		for (int i = 0; i < 3; i++)
+		for (int i = 0; i < 9; i++)
 		{
-			cubes[3*i]->transform(Matrix4f::RotateX(pi));
+			cubes[3*i-(3*i>=13)]->transform(Matrix4f::RotateZ(pi/2.0f));
 		}
+	}
+
+	void displace(int i)
+	{
+		i = i % 26;
+		cubes[i]->transform(Matrix4f::Translation(Vector4f({0.0f, 0.0f, 1.0f, 1.0f})));
 	}
 };
 
+class Camera
+{
+	Vector3f pos;
+	Vector3f center;
+	Vector3f up;
+
+	std::array<float, 6> limitsOrtho;
+	std::array<float, 4> limitsPerspec;
+
+	void updateCamera()
+	{
+		glUseProgram(program);
+
+		auto tmp = Matrix4f::LookAt(Vector4f(pos), Vector4f(center), Vector4f(up));
+		float *tmpptr = tmp.raw();
+		// printM(tmp);
+
+		unsigned int viewLoc = glGetUniformLocation(program, "view");
+		glUniformMatrix4fv(viewLoc, 1, GL_TRUE, tmpptr);
+
+		delete tmpptr;
+	}
+
+	void updateLimitsOrtho()
+	{
+		glUseProgram(program);
+
+		auto tmp = Matrix4f::Ortho(limitsOrtho[0], limitsOrtho[1], limitsOrtho[2], limitsOrtho[3], limitsOrtho[4], limitsOrtho[5]);
+		float* tmpptr = tmp.raw();
+		// printM(tmp);
+
+		unsigned int perpecLoc = glGetUniformLocation(program, "projection");
+		glUniformMatrix4fv(perpecLoc, 1, GL_TRUE, tmpptr);
+
+		delete tmpptr;
+	}
+	
+	void updateLimitsPerspec()
+	{
+		glUseProgram(program);
+
+		auto tmp = Matrix4f::Perspec(limitsPerspec[0], limitsPerspec[1], limitsPerspec[2], limitsPerspec[3]);
+		float* tmpptr = tmp.raw();
+		// printM(tmp);
+
+		unsigned int perpecLoc = glGetUniformLocation(program, "projection");
+		glUniformMatrix4fv(perpecLoc, 1, GL_TRUE, tmpptr);
+
+		delete tmpptr;
+	}
+
+public:
+	bool camera;
+
+	Camera(const Vector3f& _pos, const Vector3f& _center, const Vector3f& _up, const std::array<float, 6>& ortho, const std::array<float, 4>& perspec, bool cam) :
+		camera(cam)
+	{
+		pos = _pos;
+		center = _center;
+		up = _up;
+		limitsOrtho = ortho;
+		limitsPerspec = perspec;
+
+		updateCamera();
+		if (cam)
+			updateLimitsPerspec();
+		else
+			updateLimitsOrtho();
+	}
+
+	Vector3f getPosition() const
+	{
+		return pos;
+	}
+
+	void setPosition(const Vector3f& vec)
+	{
+		pos = vec;
+
+		updateCamera();
+	}
+
+	Vector3f getCenter() const
+	{
+		return center;
+	}
+
+	void setCenter(const Vector3f& vec)
+	{
+		center = vec;
+
+		updateCamera();
+	}
+
+	Vector3f getUpVector() const
+	{
+		return up;
+	}
+
+	void setUpVector(const Vector3f& vec)
+	{
+		up = vec;
+
+		updateCamera();
+	}
+
+	std::array<float, 6> getLimitsOrtho() const
+	{
+		return limitsOrtho;
+	}
+
+	void setLimitsOrtho(const std::array<float, 6>& arr)
+	{
+		limitsOrtho = arr;
+
+		updateLimitsOrtho();
+	}
+
+	std::array<float, 4> getLimitsPerspec() const
+	{
+		return limitsPerspec;
+	}
+
+	void setLimitsPerspec(const std::array<float, 4>& arr)
+	{
+		limitsPerspec = arr;
+
+		updateLimitsPerspec();
+	}
+
+	void move(const Vector3f& offset)
+	{
+		pos += offset;
+		center += offset;
+
+		updateCamera();
+	}
+
+	void changePerspective()
+	{
+		camera = !camera;
+		if (camera)
+			updateLimitsPerspec();
+		else
+			updateLimitsOrtho();
+	}
+};
+
+Camera* camera;
+
 Cube* cube;
+
+int disp = 0;
 
 void init()
 {
@@ -827,10 +1089,12 @@ void init()
 		"layout (location = 1) in int c;\n"
 		"uniform vec4 colors[7];\n"
 		"uniform mat4 transform;\n"
+		"uniform mat4 view;\n"
+		"uniform mat4 projection;\n"
         "void main()\n"
         "{\n"
 		"	outC = colors[c];\n"
-        "   gl_Position = transform * vec4(aPos, 1.0f);\n"
+        "   gl_Position = projection * view * transform * vec4(aPos, 1.0f);\n"
         "}\0";
 
 	const char *fragmentShaderSource = "#version 330 core\n"
@@ -863,10 +1127,20 @@ void init()
 		0.0f, 0.3f, 0.7f, 1.0f,
 		1.0f, 0.3f, 0.0f, 1.0f
 	};
+
+	glUseProgram(program);
 	
 	unsigned int colorsLoc = glGetUniformLocation(program, "colors");
-	glUseProgram(program);
 	glUniform4fv(colorsLoc, 7, colors);
+
+	camera = new Camera(
+		Vector3f({0.2f, 0.2f, 2.5f}),
+		Vector3f({0.0f, 0.0f, 0.0f}),
+		Vector3f({0.0f, 1.0f, 0.0f}),
+		{-1.0f, 1.0f, -1.0f, 1.0f, 0.1f, 5.0f},
+		{pi/4, 800.0f/600.0f, 0.1f, 5.0f},
+		true
+	);
 }
 
 void processKeyInput(GLFWwindow* window, int key, int scancode, int action, int mods)
@@ -913,8 +1187,27 @@ void processKeyInput(GLFWwindow* window, int key, int scancode, int action, int 
 		transformtrx &= Matrix4f::Scaling(Vector4f({1.0f, 1.1f, 1.0f, 1.0f}));
 	if (key == GLFW_KEY_6)
 		transformtrx &= Matrix4f::Scaling(Vector4f({1.0f, 1.0f, 1.1f, 1.0f}));
+	if (key == GLFW_KEY_7)
+	{
+		camera->setPosition(Vector3f(Matrix4f::RotateX(0.1f) & Vector4f(camera->getPosition())));
+	}
+	if (key == GLFW_KEY_8)
+	{
+		camera->setPosition(Vector3f(Matrix4f::RotateY(0.1f) & Vector4f(camera->getPosition())));
+	}
+	if (key == GLFW_KEY_9)
+	{
+		camera->setPosition(Vector3f(Matrix4f::RotateZ(0.1f) & Vector4f(camera->getPosition())));
+	}
 	if (key == GLFW_KEY_Z)
 		cube->moveFirstLine();
+	if (key == GLFW_KEY_M)
+		camera->changePerspective();
+	if (key == GLFW_KEY_0)
+	{
+		cube->displace(disp);
+		disp++;
+	}
 
 	// printM(transformtrx);
 	cube->transform(transformtrx);
