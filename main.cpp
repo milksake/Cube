@@ -31,6 +31,7 @@ Notas:
 #include <cstring>
 #include <vector>
 #include <array>
+#include <map>
 
 #define WINDOW_WIDTH 800
 #define WINDOW_HEIGHT 600
@@ -744,6 +745,38 @@ public:
 
 };
 
+template<typename T>
+class Animation
+{
+	Matrix<4, 4, T> transformation;
+	int currFrames = 0;
+	int maxFrames = 0;
+	bool finished;
+	std::vector<Object<T>*> objects;
+
+public:
+	Animation() :
+		finished(true) {}
+
+	Animation(const Matrix<4, 4, T>& trans, int duration, const std::vector<Object<T>*>& objs):
+		transformation(trans), maxFrames(duration), objects(objs), finished(false) {}
+
+	bool run()
+	{
+		if (finished)
+			return false;
+		for (auto& obj : objects)
+		{
+			obj->transform(transformation);
+		}
+		currFrames++;
+		if (currFrames >= maxFrames)
+			finished = true;
+		
+		return true;
+	}
+};
+
 typedef Vector<3, float> Vector3f;
 typedef Vector<4, float> Vector4f;
 typedef Matrix<4, 4, float> Matrix4f;
@@ -854,16 +887,38 @@ public:
 		// glDrawArrays(GL_LINE_LOOP, 0, 24);
 	}
 };
-
 class Cube
 {
 	std::vector<CubePrimitive*> cubes;
+	std::array<std::array<std::array<int, 3>, 3>, 3> indices;
 	Vector3f position;
+	int animationTime = 100;
+	Animation<float> animation;
+
+	std::map<char, std::array<int, 3>> moves = {
+		{'B', {2, 0, 1}},
+		{'F', {2, 2, 1}},
+		{'L', {0, 0, 1}},
+		{'R', {0, 2, 1}},
+		{'D', {1, 0, 1}},
+		{'U', {1, 2, 1}},
+		{'f', {2, 0, -1}},
+		{'b', {2, 2, -1}},
+		{'l', {0, 0, -1}},
+		{'r', {0, 2, -1}},
+		{'u', {1, 0, -1}},
+		{'d', {1, 2, -1}}
+	};
+
+	bool modifiable = true;
 
 public:
 	Cube()
 	{
 		std::cout << "Creating Cubes...\n";
+
+		indices[1][1][1] = -1;
+
 		int colorsx[3] = {1, 0, 5};
 		int colorsy[3] = {2, 0, 4};
 		int colorsz[3] = {3, 0, 6};
@@ -875,6 +930,9 @@ public:
 				{
 					if (i == 1 && j == 1 && k == 1)
 						continue;
+					
+					indices[i][j][k] = cubes.size();
+
 					auto iniTrans =  Matrix4f::Translation(Vector4f({-1.05f+(float)i*1.05f, -1.05f+(float)j*1.05f, -1.05f+(float)k*1.05f, 1.0f}));
 					cubes.push_back(new CubePrimitive({
 						colorsx[i] * (i == 2), colorsx[i] * (i == 0),
@@ -892,6 +950,9 @@ public:
 
 	void transform(const Matrix4f& trans)
 	{
+		if (!modifiable)
+			return;
+
 		// auto newPos = trans & Vector4f({position[0], position[1], position[2], 1.0f});
 		auto newPos = trans & Vector4f(position, true);
 		position = Vector3f({newPos[0], newPos[1], newPos[2]}); 
@@ -903,18 +964,133 @@ public:
 
 	void draw()
 	{
+		modifiable = !animation.run();
 		for (auto& cube : cubes)
 		{
 			cube->draw();
 		}
 	}
-	
-	void moveFirstLine()
+
+	void Move(const std::array<int, 3>& arr)
 	{
-		for (int i = 0; i < 9; i++)
+		if (!modifiable)
+			return;
+
+		std::vector<Object<float>*> objs;
+
+		for (int i = 0; i < 3; i++)
 		{
-			cubes[3*i-(3*i>=13)]->transform(Matrix4f::RotateZ(pi/2.0f));
+			for (int j = 0; j < 3; j++)
+			{
+				int ind;
+				if (arr[0] == 0)
+					ind = indices[arr[1]][i][j];
+				else if (arr[0] == 1)
+					ind = indices[i][arr[1]][j];
+				else
+					ind = indices[i][j][arr[1]];
+				
+				if (ind == -1)
+					continue;
+				
+				objs.push_back(cubes[ind]);
+			}
 		}
+
+		if (arr[0] == 0)
+			animation = Animation<float>(Matrix4f::RotateX(pi*arr[2]/2 / animationTime), animationTime, objs);
+		else if (arr[0] == 1)
+			animation = Animation<float>(Matrix4f::RotateY(pi*arr[2]/2 / animationTime), animationTime, objs);
+		else
+			animation = Animation<float>(Matrix4f::RotateZ(pi*arr[2]/2 / animationTime), animationTime, objs);
+
+		switch (arr[2])
+		{
+			case -2:
+				break;
+			case -1:
+			{
+				for (int i = 0; i < 3 / 2; i++)
+				{
+					for (int j = i; j < 3 - i - 1; j++)
+					{
+						if (arr[0] == 0)
+						{
+							int temp = indices[arr[1]][i][j];
+							indices[arr[1]][i][j] = indices[arr[1]][3 - 1 - j][i];
+							indices[arr[1]][3 - 1 - j][i] = indices[arr[1]][3 - 1 - i][3 - 1 - j];
+							indices[arr[1]][3 - 1 - i][3 - 1 - j] = indices[arr[1]][j][3 - 1 - i];
+							indices[arr[1]][j][3 - 1 - i] = temp;
+						}
+						else if (arr[0] == 1)
+						{
+							int temp = indices[j][arr[1]][i];
+							indices[j][arr[1]][i] = indices[i][arr[1]][3 - 1 - j];
+							indices[i][arr[1]][3 - 1 - j] = indices[3 - 1 - j][arr[1]][3 - 1 - i];
+							indices[3 - 1 - j][arr[1]][3 - 1 - i] = indices[3 - 1 - i][arr[1]][j];
+							indices[3 - 1 - i][arr[1]][j] = temp;
+						}
+						else
+						{
+							int temp = indices[i][j][arr[1]];
+							indices[i][j][arr[1]] = indices[3 - 1 - j][i][arr[1]];
+							indices[3 - 1 - j][i][arr[1]] = indices[3 - 1 - i][3 - 1 - j][arr[1]];
+							indices[3 - 1 - i][3 - 1 - j][arr[1]] = indices[j][3 - 1 - i][arr[1]];
+							indices[j][3 - 1 - i][arr[1]] = temp;
+						}
+					}
+				}
+			}
+			break;
+			case 1:
+			{
+				for (int i = 0; i < 3 / 2; i++)
+				{
+					for (int j = i; j < 3 - i - 1; j++)
+					{
+						if (arr[0] == 0)
+						{
+							int temp = indices[arr[1]][i][j];
+							indices[arr[1]][i][j] = indices[arr[1]][j][3 - 1 - i];
+							indices[arr[1]][j][3 - 1 - i] = indices[arr[1]][3 - 1 - i][3 - 1 - j];
+							indices[arr[1]][3 - 1 - i][3 - 1 - j] = indices[arr[1]][3 - 1 - j][i];
+							indices[arr[1]][3 - 1 - j][i] = temp;
+						}
+						else if (arr[0] == 1)
+						{
+							int temp = indices[j][arr[1]][i];
+							indices[j][arr[1]][i] = indices[3 - 1 - i][arr[1]][j];
+							indices[3 - 1 - i][arr[1]][j] = indices[3 - 1 - j][arr[1]][3 - 1 - i];
+							indices[3 - 1 - j][arr[1]][3 - 1 - i] = indices[i][arr[1]][3 - 1 - j];
+							indices[i][arr[1]][3 - 1 - j] = temp;
+						}
+						else
+						{
+							int temp = indices[i][j][arr[1]];
+							indices[i][j][arr[1]] = indices[j][3 - 1 - i][arr[1]];
+							indices[j][3 - 1 - i][arr[1]] = indices[3 - 1 - i][3 - 1 - j][arr[1]];
+							indices[3 - 1 - i][3 - 1 - j][arr[1]] = indices[3 - 1 - j][i][arr[1]];
+							indices[3 - 1 - j][i][arr[1]] = temp;
+						}
+					}
+				}
+			}
+			break;
+			default:
+				break;
+
+		}
+	}
+	
+	void Move(char s)
+	{
+		if (!modifiable)
+			return;
+
+		auto it = moves.find(s);
+		if (it == moves.end())
+			return;
+		Move(it->second);
 	}
 
 	void displace(int i)
@@ -1151,18 +1327,18 @@ void processKeyInput(GLFWwindow* window, int key, int scancode, int action, int 
     {
         glfwSetWindowShouldClose(window, true);
     }
-	int check[6] = {GLFW_KEY_Q, GLFW_KEY_A, GLFW_KEY_W, GLFW_KEY_S, GLFW_KEY_E, GLFW_KEY_D};
-	for (int i = 0; i < 3; i++)
-	{
-		if (key == check[2*i])
-		{
-			rgb[i] = std::min(1.0f, rgb[i] + 0.1f);
-		}
-		if (key == check[2*i+1])
-		{
-			rgb[i] = std::max(0.0f, rgb[i] - 0.1f);
-		}
-	}
+	// int check[6] = {GLFW_KEY_Q, GLFW_KEY_A, GLFW_KEY_W, GLFW_KEY_S, GLFW_KEY_E, GLFW_KEY_D};
+	// for (int i = 0; i < 3; i++)
+	// {
+	// 	if (key == check[2*i])
+	// 	{
+	// 		rgb[i] = std::min(1.0f, rgb[i] + 0.1f);
+	// 	}
+	// 	if (key == check[2*i+1])
+	// 	{
+	// 		rgb[i] = std::max(0.0f, rgb[i] - 0.1f);
+	// 	}
+	// }
 
 	auto transformtrx = Matrix4f::Identity();
 	// printM(transformtrx);
@@ -1199,8 +1375,18 @@ void processKeyInput(GLFWwindow* window, int key, int scancode, int action, int 
 	{
 		camera->setPosition(Vector3f(Matrix4f::RotateZ(0.1f) & Vector4f(camera->getPosition())));
 	}
-	if (key == GLFW_KEY_Z)
-		cube->moveFirstLine();
+	if (key == GLFW_KEY_L)
+		cube->Move('L');
+	if (key == GLFW_KEY_R)
+		cube->Move('R');
+	if (key == GLFW_KEY_U)
+		cube->Move('U');
+	if (key == GLFW_KEY_D)
+		cube->Move('D');
+	if (key == GLFW_KEY_F)
+		cube->Move('F');
+	if (key == GLFW_KEY_B)
+		cube->Move('B');
 	if (key == GLFW_KEY_M)
 		camera->changePerspective();
 	if (key == GLFW_KEY_0)
@@ -1213,7 +1399,7 @@ void processKeyInput(GLFWwindow* window, int key, int scancode, int action, int 
 	cube->transform(transformtrx);
 	// std::cout << cube->position[0] << ' ' << cube->position[1] << ' ' << cube->position[2] << '\n';
 
-	glClearColor(rgb[0], rgb[1], rgb[2], 1.0f);
+	// glClearColor(rgb[0], rgb[1], rgb[2], 1.0f);
 }
 
 void render(GLFWwindow *window)
