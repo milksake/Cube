@@ -5,16 +5,18 @@ Curso: Computación Gráfica
 Notas:
 - Las teclas son para lo siguiente:
 	- Esc: salir del programa
-	- Q: rotar cara izquierda
-	- W: rotar cara derecha
-	- E: rotar cara arriba
-	- R: rotar cara abajo
-	- T: rotar cara frente
-	- Y: rotar cara posterior
+	- Q,A: rotar cara izquierda
+	- W,S: rotar centro (vertical)
+	- E,D: rotar cara derecha
+	- R,F: rotar cara abajo
+	- T,G: rotar centro (horizontal)
+	- Y,H: rotar cara arriba
 	- 6: bajar camara
 	- 7: subir camara
 	- 8: mover camara izquierda
 	- 9: mover camara derecha
+	- M: cambiar proyeccion
+	- P: resolver cubo
 */
 
 // #define _GLIBCXX_DEBUG 1
@@ -1339,6 +1341,7 @@ public:
 		std::cout << "Current State: " << facelet << '\n';
 		uint8_t movesUsed;
 		std::string solution = min2phase::solve(facelet, 21, 1000000, 0, 0, &movesUsed);
+		solution.push_back(' ');
 		std::cout << "Solution: " << solution << '\n';
 
 		std::vector<char> solutionVector;
@@ -1671,7 +1674,7 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 int main()
 {
 	// Solver
-	std::cout << "Initializing solver\n";
+	std::cout << "Initializing solver...\n";
 	min2phase::tools::setRandomSeed(time(nullptr));
 	min2phase::init();
     // min2phase::loadFile("coords.m2pc");
