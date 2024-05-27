@@ -11,9 +11,10 @@ Notas:
 	- R: rotar cara abajo
 	- T: rotar cara frente
 	- Y: rotar cara posterior
-	- 7: camara
-	- 8: camara
-	- 9: camara
+	- 6: bajar camara
+	- 7: subir camara
+	- 8: mover camara izquierda
+	- 9: mover camara derecha
 */
 
 // #define _GLIBCXX_DEBUG 1
@@ -1600,6 +1601,8 @@ void init()
 	);
 }
 
+const float cameraStep = 0.1f;
+
 void processKeyInput(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
 	if (action != GLFW_PRESS)
@@ -1608,53 +1611,21 @@ void processKeyInput(GLFWwindow* window, int key, int scancode, int action, int 
     {
         glfwSetWindowShouldClose(window, true);
     }
-	// int check[6] = {GLFW_KEY_Q, GLFW_KEY_A, GLFW_KEY_W, GLFW_KEY_S, GLFW_KEY_E, GLFW_KEY_D};
-	// for (int i = 0; i < 3; i++)
-	// {
-	// 	if (key == check[2*i])
-	// 	{
-	// 		rgb[i] = std::min(1.0f, rgb[i] + 0.1f);
-	// 	}
-	// 	if (key == check[2*i+1])
-	// 	{
-	// 		rgb[i] = std::max(0.0f, rgb[i] - 0.1f);
-	// 	}
-	// }
-
-	//auto transformtrx = Matrix4f::Identity();
-	// printM(transformtrx);
-	/*
-	if (key == GLFW_KEY_1)
-		transformtrx &= Matrix4f::RotateX(1.0f);
-	if (key == GLFW_KEY_2)
-		transformtrx &= Matrix4f::RotateY(1.0f);
-	if (key == GLFW_KEY_3)
-		transformtrx &= Matrix4f::RotateZ(1.0f);
-	if (key == GLFW_KEY_UP)
-	 	transformtrx &= Matrix4f::Translation(Vector4f({0.0f, 0.1f, 0.0f, 1.0f}));
-	if (key == GLFW_KEY_DOWN)
-		transformtrx &= Matrix4f::Translation(Vector4f({0.0f, -0.1f, 0.0f, 1.0f}));
-	if (key == GLFW_KEY_LEFT)
-		transformtrx &= Matrix4f::Translation(Vector4f({-0.1f, 0.0f, 0.0f, 1.0f}));
-	if (key == GLFW_KEY_RIGHT)
-		transformtrx &= Matrix4f::Translation(Vector4f({0.1f, 0.0f, 0.0f, 1.0f}));
-	if (key == GLFW_KEY_4)
-		transformtrx &= Matrix4f::Scaling(Vector4f({1.1f, 1.0f, 1.0f, 1.0f}));
-	if (key == GLFW_KEY_5)
-		transformtrx &= Matrix4f::Scaling(Vector4f({1.0f, 1.1f, 1.0f, 1.0f}));
 	if (key == GLFW_KEY_6)
-		transformtrx &= Matrix4f::Scaling(Vector4f({1.0f, 1.0f, 1.1f, 1.0f}));*/
+	{
+		camera->setPosition(Vector3f(Matrix4f::RotateX(cameraStep) & Vector4f(camera->getPosition())));
+	}
 	if (key == GLFW_KEY_7)
 	{
-		camera->setPosition(Vector3f(Matrix4f::RotateX(0.1f) & Vector4f(camera->getPosition())));
+		camera->setPosition(Vector3f(Matrix4f::RotateX(-cameraStep) & Vector4f(camera->getPosition())));
 	}
 	if (key == GLFW_KEY_8)
 	{
-		camera->setPosition(Vector3f(Matrix4f::RotateY(0.1f) & Vector4f(camera->getPosition())));
+		camera->setPosition(Vector3f(Matrix4f::RotateY(-cameraStep) & Vector4f(camera->getPosition())));
 	}
 	if (key == GLFW_KEY_9)
 	{
-		camera->setPosition(Vector3f(Matrix4f::RotateZ(0.1f) & Vector4f(camera->getPosition())));
+		camera->setPosition(Vector3f(Matrix4f::RotateY(cameraStep) & Vector4f(camera->getPosition())));
 	}
 	
 	if (key == GLFW_KEY_Q)
@@ -1687,17 +1658,7 @@ void processKeyInput(GLFWwindow* window, int key, int scancode, int action, int 
 
 	if (key == GLFW_KEY_P)
 		cube->solve();
-	//if (key == GLFW_KEY_0)
-	//{
-	//	cube->displace(disp);
-	//	disp++;
-	//}
 
-	// printM(transformtrx);
-	// cube->transform(transformtrx);
-	// std::cout << cube->position[0] << ' ' << cube->position[1] << ' ' << cube->position[2] << '\n';
-
-	// glClearColor(rgb[0], rgb[1], rgb[2], 1.0f);
 }
 
 void render(GLFWwindow *window)
