@@ -1,23 +1,19 @@
 /*
-Alumno: Mariana Paula Cáceres Urquizo
+Alumno: M. P. Cáceres Urquizo
 Curso: Computación Gráfica
 
 Notas:
 - Las teclas son para lo siguiente:
 	- Esc: salir del programa
-	- Q: aumentar el rojo del fondo
-	- A: disminuir el rojo del fondo
-	- W: aumentar el verde del fondo
-	- S: disminuir el verde del fondo
-	- E: aumentar el azul del fondo
-	- D: disminuir el azul del fondo
-	- 1: rotar X
-	- 2: rotar Y
-	- 3: rotar Z
-	- 4: escalar X
-	- 5: escalar Y
-	- 6: escalar Z
-	- Up, Down, Left, Right: mover
+	- Q: rotar cara izquierda
+	- W: rotar cara derecha
+	- E: rotar cara arriba
+	- R: rotar cara abajo
+	- T: rotar cara frente
+	- Y: rotar cara posterior
+	- 7: camara
+	- 8: camara
+	- 9: camara
 */
 
 #define GLAD_GL_IMPLEMENTATION
@@ -887,13 +883,16 @@ public:
 		// glDrawArrays(GL_LINE_LOOP, 0, 24);
 	}
 };
+
 class Cube
 {
 	std::vector<CubePrimitive*> cubes;
 	std::array<std::array<std::array<int, 3>, 3>, 3> indices;
 	Vector3f position;
-	int animationTime = 100;
+	int animationTime = 200;
 	Animation<float> animation;
+	std::vector<char> solving;
+	int solvingIndex = -1;
 
 	std::map<char, std::array<int, 3>> moves = {
 		{'B', {2, 0, 1}},
@@ -902,20 +901,41 @@ class Cube
 		{'R', {0, 2, 1}},
 		{'D', {1, 0, 1}},
 		{'U', {1, 2, 1}},
-		{'f', {2, 0, -1}},
-		{'b', {2, 2, -1}},
+		{'b', {2, 0, -1}},
+		{'f', {2, 2, -1}},
 		{'l', {0, 0, -1}},
 		{'r', {0, 2, -1}},
-		{'u', {1, 0, -1}},
-		{'d', {1, 2, -1}}
+		{'d', {1, 0, -1}},
+		{'u', {1, 2, -1}},
+		{'X', {0, 1, 1}},
+		{'Y', {1, 1, 1}},
+		{'Z', {2, 1, 1}},
+		{'x', {0, 1, -1}},
+		{'y', {1, 1, -1}},
+		{'z', {2, 1, -1}},
 	};
 
+	std::map<char, std::vector<std::vector<char>>> colors;
+
 	bool modifiable = true;
+
+	void setUpSolverAnimation(const std::vector<char>& moves)
+	{
+		solving = moves;
+		solvingIndex = 0;
+	}
 
 public:
 	Cube()
 	{
 		std::cout << "Creating Cubes...\n";
+
+		colors['U'] = std::vector<std::vector<char>>(3, std::vector<char>(3, 'U'));
+		colors['D'] = std::vector<std::vector<char>>(3, std::vector<char>(3, 'D'));
+		colors['L'] = std::vector<std::vector<char>>(3, std::vector<char>(3, 'L'));
+		colors['R'] = std::vector<std::vector<char>>(3, std::vector<char>(3, 'R'));
+		colors['F'] = std::vector<std::vector<char>>(3, std::vector<char>(3, 'F'));
+		colors['B'] = std::vector<std::vector<char>>(3, std::vector<char>(3, 'B'));
 
 		indices[1][1][1] = -1;
 
@@ -945,6 +965,21 @@ public:
 		auto trans = Matrix4f::Scaling(Vector4f({0.5f, 0.5f, 0.5f, 1.0f}));
 		transform(trans);
 
+		// std::cout << "---Colors\n";
+		// for (auto& col : colors)
+		// {
+		// 	std::cout << '\t' << col.first << '\n';
+		// 	for (int i = 0; i < 3; i++)
+		// 	{
+		// 		for (int j = 0; j < 3; j++)
+		// 		{
+		// 			std::cout << col.second[i][j] << ' ';
+		// 		}
+		// 		std::cout << '\n';
+		// 	}
+		// }
+		// std::cout << "-----\n";
+
 		std::cout << "Cubes created\n";
 	}
 
@@ -964,7 +999,32 @@ public:
 
 	void draw()
 	{
-		modifiable = !animation.run();
+		bool tmp = !animation.run();
+		if (solvingIndex == -1)
+		{
+			modifiable = tmp;
+		}
+		else if (solvingIndex < solving.size())
+		{
+			if (tmp)
+			{
+				modifiable = true;
+				Move(solving[solvingIndex]);
+				solvingIndex++;
+			}
+		}
+		else
+		{
+			solvingIndex = -1;
+			modifiable = tmp;
+
+			colors['U'] = std::vector<std::vector<char>>(3, std::vector<char>(3, 'U'));
+			colors['D'] = std::vector<std::vector<char>>(3, std::vector<char>(3, 'D'));
+			colors['L'] = std::vector<std::vector<char>>(3, std::vector<char>(3, 'L'));
+			colors['R'] = std::vector<std::vector<char>>(3, std::vector<char>(3, 'R'));
+			colors['F'] = std::vector<std::vector<char>>(3, std::vector<char>(3, 'F'));
+			colors['B'] = std::vector<std::vector<char>>(3, std::vector<char>(3, 'B'));
+		}
 		for (auto& cube : cubes)
 		{
 			cube->draw();
@@ -998,11 +1058,160 @@ public:
 		}
 
 		if (arr[0] == 0)
+		{
 			animation = Animation<float>(Matrix4f::RotateX(pi*arr[2]/2 / animationTime), animationTime, objs);
+			
+			std::vector<char> order = {'U', 'F', 'D', 'B'};
+			if (arr[2] > 0)
+				reverse(order.begin(), order.end());
+			int ind1, ind2 = (order[0]=='B')?(3-arr[1]-1):arr[1];
+			char tmp[3];
+			for (int i = 0; i < 3; i++)
+			{
+				ind1 = (order[0]=='B') ? 3-i-1 : i;
+				tmp[i] = colors[order[0]][ind1][ind2];
+			}
+			for (int j = 0; j < order.size()-1; j++)
+			{
+				ind2 = (order[j]=='B')?(3-arr[1]-1):arr[1];
+				int ind22 = (order[j+1]=='B')?(3-arr[1]-1):arr[1];
+				for (int i = 0; i < 3; i++)
+				{
+					ind1 = (order[j]=='B') ? 3-i-1 : i;
+					int ind11 = (order[j+1]=='B') ? 3-i-1 : i;
+					colors[order[j]][ind1][ind2] = colors[order[j+1]][ind11][ind22];
+				}
+			}
+			ind2 = (order[order.size()-1]=='B')?(3-arr[1]-1):arr[1];
+			for (int i = 0; i < 3; i++)
+			{
+				ind1 = (order[order.size()-1]=='B') ? (3-i-1) : i;
+				colors[order[order.size()-1]][ind1][ind2] = tmp[i];
+			}
+
+			if (arr[1] != 1)
+			{
+				auto& face = colors[(arr[1] == 0) ? 'L': 'R'];
+
+				if ((arr[2] > 0 && arr[1] == 0) || (arr[2] < 0 && arr[1] == 2))
+				{
+					for (int i = 0; i < 3 / 2; i++)
+					{
+						for (int j = i; j < 3 - i - 1; j++)
+						{
+							int temp = face[i][j];
+							face[i][j] = face[3 - 1 - j][i];
+							face[3 - 1 - j][i] = face[3 - 1 - i][3 - 1 - j];
+							face[3 - 1 - i][3 - 1 - j] = face[j][3 - 1 - i];
+							face[j][3 - 1 - i] = temp;
+						}
+					}
+				}
+				else
+				{
+					for (int i = 0; i < 3 / 2; i++)
+					{
+						for (int j = i; j < 3 - i - 1; j++)
+						{
+							int temp = face[i][j];
+							face[i][j] = face[j][3 - 1 - i];
+							face[j][3 - 1 - i] = face[3 - 1 - i][3 - 1 - j];
+							face[3 - 1 - i][3 - 1 - j] = face[3 - 1 - j][i];
+							face[3 - 1 - j][i] = temp;
+						}
+					}
+				}
+			}
+		}
 		else if (arr[0] == 1)
+		{
 			animation = Animation<float>(Matrix4f::RotateY(pi*arr[2]/2 / animationTime), animationTime, objs);
+		
+			std::vector<char> order = {'F', 'R', 'B', 'L'};
+			if (arr[2] > 0)
+				reverse(order.begin(), order.end());
+			int ind1, ind2 = 3-1-arr[1];
+			char tmp[3];
+			for (int i = 0; i < 3; i++)
+			{
+				ind1 = i;
+				tmp[i] = colors[order[0]][ind2][ind1];
+			}
+			for (int j = 0; j < order.size()-1; j++)
+			{
+				ind2 = 3-1-arr[1];
+				int ind22 = 3-1-arr[1];
+				for (int i = 0; i < 3; i++)
+				{
+					ind1 = i;
+					int ind11 = i;
+					colors[order[j]][ind2][ind1] = colors[order[j+1]][ind22][ind11];
+				}
+			}
+			ind2 = 3-1-arr[1];
+			for (int i = 0; i < 3; i++)
+			{
+				ind1 = i;
+				colors[order[order.size()-1]][ind2][ind1] = tmp[i];
+			}
+
+			if (arr[1] != 1)
+			{
+				auto& face = colors[(arr[1] == 0) ? 'D': 'U'];
+
+				if ((arr[2] < 0 && arr[1] == 2) || (arr[2] > 0 && arr[1] == 0))
+				{
+					for (int i = 0; i < 3 / 2; i++)
+					{
+						for (int j = i; j < 3 - i - 1; j++)
+						{
+							int temp = face[i][j];
+							face[i][j] = face[3 - 1 - j][i];
+							face[3 - 1 - j][i] = face[3 - 1 - i][3 - 1 - j];
+							face[3 - 1 - i][3 - 1 - j] = face[j][3 - 1 - i];
+							face[j][3 - 1 - i] = temp;
+						}
+					}
+				}
+				else
+				{
+					for (int i = 0; i < 3 / 2; i++)
+					{
+						for (int j = i; j < 3 - i - 1; j++)
+						{
+							int temp = face[i][j];
+							face[i][j] = face[j][3 - 1 - i];
+							face[j][3 - 1 - i] = face[3 - 1 - i][3 - 1 - j];
+							face[3 - 1 - i][3 - 1 - j] = face[3 - 1 - j][i];
+							face[3 - 1 - j][i] = temp;
+						}
+					}
+				}
+			}
+		}
 		else
+		{
 			animation = Animation<float>(Matrix4f::RotateZ(pi*arr[2]/2 / animationTime), animationTime, objs);
+		
+
+		}
+
+		// std::cout << "---Colors\n";
+		// for (auto& col : colors)
+		// {
+		// 	std::cout << '\t' << col.first << '\n';
+		// 	for (int i = 0; i < 3; i++)
+		// 	{
+		// 		for (int j = 0; j < 3; j++)
+		// 		{
+		// 			std::cout << col.second[i][j] << ' ';
+		// 		}
+		// 		std::cout << '\n';
+		// 	}
+		// }
+		// std::cout << "-----\n";
+		
+		modifiable = false;
 
 		switch (arr[2])
 		{
@@ -1097,6 +1306,33 @@ public:
 	{
 		i = i % 26;
 		cubes[i]->transform(Matrix4f::Translation(Vector4f({0.0f, 0.0f, 1.0f, 1.0f})));
+	}
+
+	void solve()
+	{
+		modifiable = false;
+		std::vector<char> order = {'U', 'R', 'F', 'D', 'L', 'B'};
+
+		std::string facelet;
+		for (char o : order)
+		{
+			auto& face = colors[o];
+			for (int i = 0; i < 3; i++)
+			{
+				for (int j = 0; j < 3; j++)
+				{
+					facelet.push_back(face[i][j]);
+				}
+			}
+		}
+
+		// TO DO
+		// std::cout << facelet << '\n';
+		// llamar al solver aqui
+		// convertir solution en vector de chars (instrucciones);
+
+		// llamar a esta funcion con el vector de chars;
+		// setUpSolverAnimation(vector de chars);
 	}
 };
 
@@ -1340,9 +1576,9 @@ void processKeyInput(GLFWwindow* window, int key, int scancode, int action, int 
 	// 	}
 	// }
 
-	auto transformtrx = Matrix4f::Identity();
+	//auto transformtrx = Matrix4f::Identity();
 	// printM(transformtrx);
-
+	/*
 	if (key == GLFW_KEY_1)
 		transformtrx &= Matrix4f::RotateX(1.0f);
 	if (key == GLFW_KEY_2)
@@ -1362,7 +1598,7 @@ void processKeyInput(GLFWwindow* window, int key, int scancode, int action, int 
 	if (key == GLFW_KEY_5)
 		transformtrx &= Matrix4f::Scaling(Vector4f({1.0f, 1.1f, 1.0f, 1.0f}));
 	if (key == GLFW_KEY_6)
-		transformtrx &= Matrix4f::Scaling(Vector4f({1.0f, 1.0f, 1.1f, 1.0f}));
+		transformtrx &= Matrix4f::Scaling(Vector4f({1.0f, 1.0f, 1.1f, 1.0f}));*/
 	if (key == GLFW_KEY_7)
 	{
 		camera->setPosition(Vector3f(Matrix4f::RotateX(0.1f) & Vector4f(camera->getPosition())));
@@ -1375,28 +1611,45 @@ void processKeyInput(GLFWwindow* window, int key, int scancode, int action, int 
 	{
 		camera->setPosition(Vector3f(Matrix4f::RotateZ(0.1f) & Vector4f(camera->getPosition())));
 	}
-	if (key == GLFW_KEY_L)
+	
+	if (key == GLFW_KEY_Q)
 		cube->Move('L');
-	if (key == GLFW_KEY_R)
+	if (key == GLFW_KEY_W)
+		cube->Move('X');
+	if (key == GLFW_KEY_E)
 		cube->Move('R');
-	if (key == GLFW_KEY_U)
-		cube->Move('U');
-	if (key == GLFW_KEY_D)
+	if (key == GLFW_KEY_R)
 		cube->Move('D');
+	if (key == GLFW_KEY_T)
+		cube->Move('Y');
+	if (key == GLFW_KEY_Y)
+		cube->Move('U');
+	if (key == GLFW_KEY_A)
+		cube->Move('l');
+	if (key == GLFW_KEY_S)
+		cube->Move('x');
+	if (key == GLFW_KEY_D)
+		cube->Move('r');
 	if (key == GLFW_KEY_F)
-		cube->Move('F');
-	if (key == GLFW_KEY_B)
-		cube->Move('B');
+		cube->Move('d');
+	if (key == GLFW_KEY_G)
+		cube->Move('y');
+	if (key == GLFW_KEY_H)
+		cube->Move('u');
+	
 	if (key == GLFW_KEY_M)
 		camera->changePerspective();
-	if (key == GLFW_KEY_0)
-	{
-		cube->displace(disp);
-		disp++;
-	}
+
+	if (key == GLFW_KEY_P)
+		cube->solve();
+	//if (key == GLFW_KEY_0)
+	//{
+	//	cube->displace(disp);
+	//	disp++;
+	//}
 
 	// printM(transformtrx);
-	cube->transform(transformtrx);
+	// cube->transform(transformtrx);
 	// std::cout << cube->position[0] << ' ' << cube->position[1] << ' ' << cube->position[2] << '\n';
 
 	// glClearColor(rgb[0], rgb[1], rgb[2], 1.0f);
