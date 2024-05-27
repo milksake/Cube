@@ -16,6 +16,8 @@ Notas:
 	- 9: camara
 */
 
+// #define _GLIBCXX_DEBUG 1
+
 #define GLAD_GL_IMPLEMENTATION
 #include <glad/gl.h>
 #define GLFW_INCLUDE_NONE
@@ -28,6 +30,10 @@ Notas:
 #include <vector>
 #include <array>
 #include <map>
+
+// Solver
+#include <min2phase/min2phase.h>
+#include <min2phase/tools.h>
 
 #define WINDOW_WIDTH 800
 #define WINDOW_HEIGHT 600
@@ -1310,6 +1316,9 @@ public:
 
 	void solve()
 	{
+		if (!modifiable || solvingIndex != -1)
+			return;
+
 		modifiable = false;
 		std::vector<char> order = {'U', 'R', 'F', 'D', 'L', 'B'};
 
@@ -1326,13 +1335,49 @@ public:
 			}
 		}
 
-		// TO DO
-		// std::cout << facelet << '\n';
-		// llamar al solver aqui
-		// convertir solution en vector de chars (instrucciones);
+		std::cout << "Current State: " << facelet << '\n';
+		uint8_t movesUsed;
+		std::string solution = min2phase::solve(facelet, 21, 1000000, 0, 0, &movesUsed);
+		std::cout << "Solution: " << solution << '\n';
 
-		// llamar a esta funcion con el vector de chars;
-		// setUpSolverAnimation(vector de chars);
+		std::vector<char> solutionVector;
+		for (size_t i = 0; i < solution.size(); ++i)
+		{
+			if (solution[i] != ' ')
+			{
+				if (solution[i] == '2')
+				{
+					solutionVector.push_back(solution[i-1]);
+					solutionVector.push_back(solution[i-1]);
+				}
+				else if (solution[i] == '\'')
+				{
+					solutionVector.push_back(tolower(solution[i-1]));
+				}
+				else if (solution[i+1] != '2' && solution[i+1] != '\'')
+				{
+					solutionVector.push_back(solution[i]);
+				}
+			}
+		}
+
+		for (char& c: solutionVector)
+		{
+			if (c == 'R')
+				c = 'r';
+			else if (c == 'r')
+				c = 'R';
+			else if (c == 'U')
+				c = 'u';
+			else if (c == 'u')
+				c = 'U';
+			else if (c == 'F')
+				c = 'f';
+			else if (c == 'f')
+				c = 'F';
+		}
+    
+		setUpSolverAnimation(solutionVector);
 	}
 };
 
@@ -1664,6 +1709,13 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 
 int main()
 {
+	// Solver
+	std::cout << "Initializing solver\n";
+	min2phase::tools::setRandomSeed(time(nullptr));
+	min2phase::init();
+    // min2phase::loadFile("coords.m2pc");
+	std::cout << "Solver initialized\n";
+
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);

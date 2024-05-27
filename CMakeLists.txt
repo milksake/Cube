@@ -11,9 +11,9 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 set(CMAKE_BUILD_TYPE Release )
 
-link_libraries(glfw)
+link_libraries(glfw min2phase)
 
-include_directories("${GLFW_SOURCE_DIR}/deps")
+include_directories("${GLFW_SOURCE_DIR}/deps" "${GLFW_SOURCE_DIR}/OwnProjects/min2phasedir/include")
 
 if (MATH_LIBRARY)
 	message(${MATH_LIBRARY})
